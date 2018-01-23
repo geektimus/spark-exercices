@@ -11,6 +11,11 @@ object MostPopularHero {
 
     val sc = new SparkContext("local[*]", "MostPopularHero")
 
+    findTopTenHeroes(sc)
+
+  }
+
+  private def findTopTenHeroes(sc: SparkContext): Unit = {
     val marvelNames = sc.textFile("../data/marvel-names.txt")
     val namesRDD = marvelNames.flatMap(parseHeroNames)
 
@@ -19,11 +24,12 @@ object MostPopularHero {
     val mostPopularHero = marvelGraph
       .map(countCoOccurrences)
       .reduceByKey(defaultReducer)
-      .max()(Ordering.by(_._2))
 
-    val heroLookup = namesRDD.lookup(mostPopularHero._1).head
-
-    println(s"The most popular hero is $heroLookup with ${mostPopularHero._2} co-appearances")
+    mostPopularHero.join(namesRDD)
+      .map(heroComplex => heroComplex._2)
+      .sortBy(_._1, ascending = false)
+      .take(10)
+      .foreach(hero => println(s"Hero: ${hero._2}, Rating: ${hero._1}"))
   }
 
   private def parseHeroNames(line: String) = {
